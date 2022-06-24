@@ -1,27 +1,10 @@
 import { useState, useEffect} from 'react';
 import TwoClubs from './cards/2C.svg'
+import { Card } from './Card';
 
 
-export class Card {
-  constructor(suit, val){
-    this.suit = suit
-    this.val = val
-  }
-}
 
-export function CreateGame(){
 
-  const [gameData, setGameData] = useState()
-  useEffect(() => {
-    alert("testing..")
-    fetch("http://192.168.178.102:10000/games/new/test/andy")
-    .then((res) => res.json())
-    .then((json) => setGameData(json))
-
-  }, [])
-  return gameData != null ? 
-  <Game gameData={gameData} /> : "loading"
-}
 
 
 
@@ -39,7 +22,7 @@ export function Game(props) {
         .then((res) => res.json())
         .then((json) => setGameData(json))
       } 
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);    
   }, [gameData.IsActive])
 
@@ -48,7 +31,7 @@ export function Game(props) {
     if(gameData.CurrentTurn != currentTurn) {
         setCurrentTurn(gameData.CurrentTurn)
       }
-    },3000)
+    },1500)
 
   }, [gameData])
 
@@ -57,12 +40,14 @@ export function Game(props) {
     
     let newState = {...gameData}
     newState.IsActive = 0
-    if(newState.Turns.length == 0) {
+    if(newState.Turns.length <=  currentTurn) {
       let map = new Map()
       map[gameData.CurrentPlayer] = card
-      newState.Turns[0] = {
+      newState.Turns[currentTurn] = {
         PlayedCards : map
       }
+    } else {
+      newState.Turns[currentTurn].PlayedCards[gameData.CurrentPlayer] = card
     }
     
     setGameData(gameData => ({...newState}))   
@@ -73,7 +58,7 @@ export function Game(props) {
       CardId: card.Id
     }
       
-    fetch("http://192.168.178.102:10000/games/play", {
+    fetch("http://localhost:10000/games/play", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -84,20 +69,54 @@ export function Game(props) {
 
   const cardString = (c) => c.ValueName + " of " + c.Suit + "s" 
   
+  const getPlayerInfo = (i) => {
+    var playedCard = ""
+    var player = gameData.Players[i].Id
+    if (gameData.Turns.length > gameData.CurrentTurn) {
+      var playedCards = gameData.Turns[currentTurn].PlayedCards  
+      if (player in playedCards){
+        playedCard = playedCards[player]
+      }
+
+    }
+    return { Card: playedCard, Name: gameData.Players[i].Name}
+
+  }
+
   return (
     <div>
       <br />
       <h3> Game</h3>
+
+      <div style={{margin: 'auto', width:'33%', padding: '10px',  textAlign:'center'}}>
+      <PlayedCard playerInfo={getPlayerInfo(2)} />
+      </div>
+
+      <div style={{display:'flex'}}>
+        <div style={{margin: 'auto', width:'33%', backgroundColor:'', padding: '10px',  textAlign:'center'}}> 
+        <PlayedCard playerInfo={getPlayerInfo(3)} />
+        </div>
+        <div style={{margin: 'auto', width:'33%', padding: '10px', textAlign:'center'}}> </div>
+        <div style={{margin: 'auto', width:'33%', padding: '10px',  textAlign:'center'}}> 
+        <PlayedCard playerInfo={getPlayerInfo(1)} />
+        </div>
+      </div>
+
+      <div style={{margin: 'auto', width:'33%', padding: '10px',  textAlign:'center'}}>
+        <PlayedCard playerInfo={getPlayerInfo(0)} />
+      </div>
+     
+    
      
 
-     <PlayedCardsSection Turns = {gameData.Turns} CurrentTurn={currentTurn}/>
+    
       <br />
 
       <h3> Your Hand </h3>
       <p> (trump card: {cardString(props.gameData.TrumpCard)})</p>
       <br />
       <div>
-        {gameData.RemainingCards.map((c) => <span style={{padding:"5%"}}><button onClick={(e) => playCard(c)}> {c.ValueName + " of " + c.Suit + "s" } </button></span>)}
+        {gameData.RemainingCards.map((c) => <span style={{padding:"5%"}} onClick={() => playCard(c)}> <Card card={c} width="6.5%"/> </span>)}
       </div>
 
       <br />
@@ -109,7 +128,7 @@ export function Game(props) {
      <br />
      <p>(game: {gameData.GameId}, active: {gameData.IsActive ? "true" : "false"} turn# {currentTurn}</p>
 
-     <img src={TwoClubs} width="8%" />
+   
     
     </div>
 
@@ -119,28 +138,12 @@ export function Game(props) {
 
 
 
-function PlayedCardsSection({Turns, CurrentTurn}) {
-  if (Turns.length <= CurrentTurn) {
-    return ""
-  }  
+function PlayedCard(props) {
 
-  Object.keys(Turns[CurrentTurn].PlayedCards).map((k) => {
-    console.log(k)
-    
-  })
-  
 
-  return (
-    <div>
-      
-        {
-      Object.keys(Turns[CurrentTurn].PlayedCards).map((k) => {
-          let c = Turns[CurrentTurn].PlayedCards[k]
-          return <span style={{padding:"5%"}}>{c.ValueName + " of " + c.Suit + "s" }</span>
-        })
-        
-    }
-   
-    </div>
-  )
+return (<div>
+  { props.playerInfo.Card == "" ? "" : <Card card ={props.playerInfo.Card} width = "15%"/>}
+  <h4> {props.playerInfo.Name }</h4>
+
+</div>)
 }

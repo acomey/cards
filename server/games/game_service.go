@@ -35,6 +35,7 @@ func (g *GameService) GetPlayerUpdates(playerId int) PlayerState {
 		IsActive:      isActive,
 	}
 	//TODO PLAYERS ORDER BY CURRENTPLAYER + TURN ORDER
+
 	var cards []PlayerCard
 	g.db.Find(&cards, "player_id = ?", player.Id)
 	for _, card := range cards {
@@ -43,6 +44,10 @@ func (g *GameService) GetPlayerUpdates(playerId int) PlayerState {
 
 	var turns []GameTurn
 	g.db.Find(&turns, "game_id = ? ", game.Id)
+
+	var players []GamePlayer
+	g.db.Find(&players, "game_id = ? ", game.Id)
+	state.Players = players
 
 	for _, turn := range turns {
 		if len(state.Turns) > turn.TurnNumber {

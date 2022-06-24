@@ -7,9 +7,9 @@ import {
   Link,
   Routes
 } from "react-router-dom";
-import { Game, CreateGame } from './Game';
+import { Game } from './Game';
 import { useEffect, useState } from 'react';
-import { JoinGame } from './JoinGame';
+import { JoinGame , CreateGame} from './JoinGame';
 
 function App() {
   return (

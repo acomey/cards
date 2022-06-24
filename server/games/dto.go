@@ -5,6 +5,7 @@ type PlayerState struct {
 	TrumpCard      Card
 	CurrentPlayer  int
 	CurrentTurn    int
+	Players        []GamePlayer
 	RemainingCards []Card
 	Turns          []Turn
 	IsActive       bool

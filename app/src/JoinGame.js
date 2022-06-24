@@ -9,8 +9,7 @@ export function JoinGame(){
     let {id, name} = useParams()
 
     useEffect(() => {
-      alert("testing..")
-      fetch("http://192.168.178.102:10000/games/join/"+ id + "/" + name)
+      fetch("http://localhost:10000/games/join/"+ id + "/" + name)
       .then((res) => res.json())
       .then((json) => setGameData(json))
   
@@ -19,4 +18,17 @@ export function JoinGame(){
     return gameData != null ? 
   <Game gameData={gameData} /> : "loading"
 
+}
+
+export function CreateGame(){
+
+  const [gameData, setGameData] = useState()
+  useEffect(() => {
+    fetch("http://localhost:10000/games/new/test/andy")
+    .then((res) => res.json())
+    .then((json) => setGameData(json))
+
+  }, [])
+  return gameData != null ? 
+  <Game gameData={gameData} /> : "loading"
 }

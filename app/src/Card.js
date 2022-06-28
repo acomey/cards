@@ -53,7 +53,7 @@ import AceHearts from './cards/KH.svg'
 
 
 
-export function Card({card, width}){
+export function Card({card, height}){
 
     var cards = {
         '2C':   TwoClubs,
@@ -113,7 +113,7 @@ export function Card({card, width}){
 
     var key = card.Value + card.Suit[0]
     
-    return <img src={cards[key]} width={width}/>
+    return <img src={cards[key]} width="120" height="100%" />
     
 }
 

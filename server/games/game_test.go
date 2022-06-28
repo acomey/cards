@@ -21,7 +21,7 @@ func Test_PlayTurn(t *testing.T) {
 
 	turn := GameTurn{
 		GameId:   game.Id,
-		CardId:   gamesService.GetCardToPlay(playerId),
+		CardId:   1,
 		PlayerId: playerId,
 	}
 	gamesService.PlayTurn(turn)
@@ -44,7 +44,7 @@ func Test_GetData(t *testing.T) {
 
 	turn := GameTurn{
 		GameId:   game.Id,
-		CardId:   gamesService.GetCardToPlay(playerId),
+		CardId:   1,
 		PlayerId: playerId,
 	}
 	gamesService.PlayTurn(turn)

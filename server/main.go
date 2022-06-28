@@ -38,7 +38,7 @@ func handleRequests(apiController *ApiController) {
 }
 
 func main() {
-	dsn := "host=localhost dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+	dsn := "host=192.168.122.44 dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"
 	db, _ := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	gamesService := games.NewGameService(db)
 	apiController := &ApiController{GameService: *gamesService}

@@ -27,14 +27,14 @@ func (g *GameService) GetPlayerUpdates(playerId int) PlayerState {
 	}
 
 	state := PlayerState{
-		GameId:        game.Id,
-		TrumpCard:     getCard(game.TrumpCard),
-		CurrentPlayer: playerId,
-		CurrentTurn:   game.Turn,
-		Turns:         []Turn{},
-		IsActive:      isActive,
+		GameId:         game.Id,
+		TrumpCard:      getCard(game.TrumpCard),
+		CurrentPlayer:  playerId,
+		CurrentTurn:    game.Turn,
+		RemainingCards: []Card{},
+		Turns:          []Turn{},
+		IsActive:       isActive,
 	}
-	//TODO PLAYERS ORDER BY CURRENTPLAYER + TURN ORDER
 
 	var cards []PlayerCard
 	g.db.Find(&cards, "player_id = ?", player.Id)
@@ -46,7 +46,8 @@ func (g *GameService) GetPlayerUpdates(playerId int) PlayerState {
 	g.db.Find(&turns, "game_id = ? ", game.Id)
 
 	var players []GamePlayer
-	g.db.Find(&players, "game_id = ? ", game.Id)
+	orderBy := fmt.Sprintf("(id - %d + 4)%%4 asc", playerId)
+	g.db.Order(orderBy).Find(&players, "game_id = ? ", game.Id)
 	state.Players = players
 
 	for _, turn := range turns {
@@ -63,38 +64,6 @@ func (g *GameService) GetPlayerUpdates(playerId int) PlayerState {
 	}
 	return state
 }
-
-/*
-func (g *GameService) GetGameData(gameId, playerId string) GameDetails {
-	var game Game
-	var players []GamePlayer
-
-	g.db.First(&game, "id=?", gameId)
-	g.db.Find(&players, "game_id = ?", game.Id)
-
-	playerDataList := []PlayerData{}
-	for _, player := range players {
-
-		playerData := PlayerData{Id: player.Id, Name: player.Name, Hand: []Card{}, PlayedCards: []Card{}}
-
-		var cards []PlayerCard
-		g.db.Find(&cards, "player_id = ?", player.Id)
-
-		for _, c := range cards {
-			playerData.Hand = append(playerData.Hand, getCard(c.CardId))
-		}
-
-		var turns []GameTurn
-		g.db.Find(&turns, "player_id = ?", player.Id)
-		for _, t := range turns {
-			playerData.PlayedCards = append(playerData.PlayedCards, getCard(t.CardId))
-		}
-
-		playerDataList = append(playerDataList, playerData)
-	}
-	return GameDetails{Game: game, Players: playerDataList}
-
-}*/
 
 func (g *GameService) Create(name, playerName string) int {
 
@@ -182,7 +151,7 @@ func (g *GameService) playBotTurns(game *Game, currentPlayer GamePlayer) {
 		turn := GameTurn{
 			GameId:      game.Id,
 			PlayerId:    nextPlayer.Id,
-			CardId:      g.GetCardToPlay(nextPlayer.Id),
+			CardId:      g.GetCardToPlay(game.Id, nextPlayer.Id, game.Turn),
 			TurnNumber:  game.Turn,
 			RoundNumber: game.Round,
 		}
@@ -204,10 +173,35 @@ func (g *GameService) getNextPlayer(game *Game, currentPlayer GamePlayer) GamePl
 	return nextPlayer
 }
 
-func (g *GameService) GetCardToPlay(playerId int) int {
-	var card PlayerCard
-	g.db.First(&card, "player_id = ?", playerId)
-	return card.CardId
+func (g *GameService) GetCardToPlay(gameId, playerId, turnNumber int) int {
+
+	leader, suitToFollow := g.getLeaderAndSuit(gameId, turnNumber)
+
+	var cards []PlayerCard
+	g.db.Find(&cards, "player_id = ?", playerId) //order desc TODO
+
+	if leader == playerId {
+		return cards[0].CardId
+	}
+	for _, c := range cards {
+		card := getCard(c.CardId)
+		if card.Suit == suitToFollow {
+			return c.CardId
+		}
+
+	}
+
+	return cards[0].CardId
+}
+
+func (g *GameService) getLeaderAndSuit(gameId, turnNumber int) (int, string) {
+	var leader GamePlayer
+	g.db.First(&leader, "game_id = ? and turn_order = 0", gameId)
+
+	//if leader
+	var leaderTurn GameTurn
+	g.db.First(&leaderTurn, "game_id = ? and turn_number = ?", gameId, turnNumber)
+	return leader.Id, getCard(leaderTurn.CardId).Suit
 }
 
 func (g *GameService) saveTurnAndScores(game *Game, player GamePlayer, turn GameTurn) {
@@ -215,40 +209,49 @@ func (g *GameService) saveTurnAndScores(game *Game, player GamePlayer, turn Game
 	g.db.Delete(&PlayerCard{}, "player_id = ? AND card_id = ?", player.Id, turn.CardId)
 
 	if player.TurnOrder == 3 {
-		var turns []GameTurn
-		g.db.Find(&turns, "game_id=? and turn_number=?", game.Id, game.Turn)
+		g.updateScores(game)
+	}
+}
 
-		winner := g.getWinner(turns)
-		winner.Score += 5
-		g.db.Save(&winner)
+func (g *GameService) updateScores(game *Game) {
 
-		//updating turn orders
-		increment := 4 - winner.TurnOrder
-		var players []GamePlayer
-		g.db.Find(&players, "game_id=?", game.Id)
-		for _, p := range players {
-			p.TurnOrder = (p.TurnOrder + increment) % 4
-			g.db.Save(&p)
-		}
-		//g.db.Save(&players)
+	var winner GamePlayer
+	g.db.Find(&winner, g.getWinnerId(*game))
+	winner.Score += 5
+	g.db.Save(&winner)
 
+	//updating turn orders
+	increment := 4 - winner.TurnOrder
+	var players []GamePlayer
+	g.db.Find(&players, "game_id=?", game.Id)
+
+	for _, p := range players {
+		p.TurnOrder = (p.TurnOrder + increment) % 4
+		g.db.Save(&p)
+	}
+
+	if game.Turn < 4 {
 		game.Turn++
 		g.db.Save(&game)
 	}
-
 }
 
-func (g *GameService) getWinner(turns []GameTurn) GamePlayer {
-	winningPlayerId := 0
-	highestCard := 0
-	for _, turn := range turns {
-		if turn.CardId > highestCard {
-			winningPlayerId = turn.PlayerId
-			highestCard = turn.CardId
+func (g *GameService) getWinnerId(game Game) int {
+	var turns []GameTurn
+	g.db.Order("card_id desc").Find(&turns, "game_id=? and turn_number=?", game.Id, game.Turn)
+
+	trumpSuit := getCard(game.TrumpCard).Suit
+	leader, suitToFollow := g.getLeaderAndSuit(game.Id, game.Turn)
+
+	highestSuits := []string{trumpSuit, suitToFollow}
+
+	for _, suit := range highestSuits {
+		for _, turn := range turns {
+			c := getCard(turn.CardId)
+			if c.Suit == suit {
+				return turn.PlayerId
+			}
 		}
 	}
-
-	var winner GamePlayer
-	g.db.Find(&winner, winningPlayerId)
-	return winner
+	return leader
 }
